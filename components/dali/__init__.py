@@ -10,6 +10,7 @@ import esphome.config_validation as cv
 CONF_DALI_BUS = 'dali_bus'
 
 dali_ns = cg.esphome_ns.namespace('dali')
+dali_lib_ns = cg.global_ns #.namespace('dali')
 DaliBusComponent = dali_ns.class_('DaliBusComponent', cg.Component)
 
 CONFIG_SCHEMA = cv.Schema({

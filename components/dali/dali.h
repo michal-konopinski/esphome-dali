@@ -6,9 +6,9 @@
 #if !defined(DALI_LOGD)
 #if defined(ESP32)
 static const char *const TAG_DALI = "dali";
-#define DALI_LOGD(x, ...) ESP_LOGD(TAG_DALI, x, #__VA_ARGS__)
-#define DALI_LOGW(x, ...) ESP_LOGW(TAG_DALI, x, #__VA_ARGS__)
-#define DALI_LOGE(x, ...) ESP_LOGE(TAG_DALI, x, #__VA_ARGS__)
+#define DALI_LOGD(...) ESP_LOGD(TAG_DALI, __VA_ARGS__)
+#define DALI_LOGW(...) ESP_LOGW(TAG_DALI, __VA_ARGS__)
+#define DALI_LOGE(...) ESP_LOGE(TAG_DALI, __VA_ARGS__)
 #elif defined(ARDUINO)
 #define DALI_LOGD(x, ...) Serial.print(x)
 #define DALI_LOGW(x, ...) Serial.print(x)
@@ -205,6 +205,11 @@ enum class DaliDeviceType : uint8_t {
     DIGITAL = 5,
     LED = 6,
     COLOR = 8
+};
+
+enum class DaliLedDimmingCurve : uint8_t {
+    LOGARITHMIC = 0,
+    LINEAR = 1
 };
 
 /// @brief Abstract class for interfacing with a physical DALI bus
@@ -558,11 +563,6 @@ public:
 
 private:
     DaliPort& port;
-};
-
-enum class DaliLedDimmingCurve : uint8_t {
-    Logarithmic = 0,
-    Linear = 1
 };
 
 class DaliLedClass {

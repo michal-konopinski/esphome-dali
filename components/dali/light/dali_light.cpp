@@ -43,14 +43,36 @@ void dali::DaliLight::setup_state(light::LightState *state) {
                 ESP_LOGD(TAG, "Does not support color temperature");
             }
 
-            // if (state->initial_state_.has_value() && state->initial_state_.value().color_mode != ColorMode::UNKNOWN) {
-            //     this->tc_supported_ = state->initial_state_.value().color_mode == ColorMode::COLOR_TEMPERATURE;
-            //     if (tc_supported_) {
-            //         ESP_LOGD(TAG, "Override: supports color temperature");
-            //     } else {
-            //         ESP_LOGD(TAG, "Override: does not support color temperature");
-            //     }
-            // }
+            // Force a color mode irrespective of what the device itself says it supports
+            // eg. you can convert a CT capable device to a plain brighness device
+            if (this->color_mode_.has_value()) {
+                if (this->color_mode_.value() == DaliColorMode::COLOR_TEMPERATURE) {
+                    tc_supported_ = true;
+                    ESP_LOGD(TAG, "Override: supports color temperature");
+                } else {
+                    tc_supported_ = false;
+                    ESP_LOGD(TAG, "Override: does not support color temperature");
+                }
+            }
+
+            ESP_LOGD(TAG, "Sending configuration to device...");
+
+            if (this->brightness_curve_.has_value()) {
+                switch (this->brightness_curve_.value()) {
+                    case DaliLedDimmingCurve::LOGARITHMIC: ESP_LOGD(TAG, "Setting brightness curve to LOGARITHMIC"); break;
+                    case DaliLedDimmingCurve::LINEAR:      ESP_LOGD(TAG, "Setting brightness curve to LINEAR"); break;
+                }
+                bus->dali.led.setDimmingCurve(address_, this->brightness_curve_.value());
+            }
+
+            if (this->fade_rate_.has_value()) {
+                ESP_LOGD(TAG, "Setting fade rate: %d", this->fade_rate_.value());
+                bus->dali.lamp.setFadeRate(0, this->fade_rate_.value());
+            }
+            if (this->fade_time_.has_value()) {
+                ESP_LOGD(TAG, "Setting fade time: %d", this->fade_time_.value());
+                bus->dali.lamp.setFadeTime(0, this->fade_time_.value());
+            }
 
             // // Optional configuration:
             // dali.lamp.setFadeRate(0, 7);
