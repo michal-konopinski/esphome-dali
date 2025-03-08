@@ -14,22 +14,50 @@ void DaliBusComponent::setup() {
     if (m_discovery) {
         DALI_LOGI("Begin device discovery...");
 
-        if (dali.bus_manager.isControlGearPresent()) {
-            DALI_LOGD("Detected control gear on bus");
-        } else {
-            DALI_LOGW("No control gear detected on bus!");
+        // if (dali.bus_manager.isControlGearPresent()) {
+        //     DALI_LOGD("Detected control gear on bus");
+        // } else {
+        //     DALI_LOGW("No control gear detected on bus!");
+        // }
+
+        if (this->m_initialize_addresses) {
+            DALI_LOGI("Randomizing addresses for unassigned DALI devices");
+            // Only randomize devices without an assigned short address
+            dali.bus_manager.initialize(ASSIGN_UNINITIALIZED); 
+            //dali.bus_manager.initialize(ASSIGN_ALL); 
+            dali.bus_manager.randomize();
+            dali.bus_manager.terminate();
+            // Seem to need a delay to allow time for devices to randomize...
         }
 
-        dali.bus_manager.startAddressScan();
-
+        dali.bus_manager.startAddressScan(); // All devices
 
         for (int i = 0; i < 64; i++) {
             m_discovered_addresses[i] = 0;
         }
 
-        short_addr_t short_addr;
-        uint32_t long_addr;
+        // TODO: Device discovery doesn't seem to be working correctly with two devices attached.
+        // Unsure if it is my physical circuit, or a bug in the discovery algorithm.
+        //
+        // It seems that both devices get assigned different random addresses,
+        // and the search correctly finds the lowest address,
+        // but when calling withdraw() on the lower address both stop responding.
+        // 
+        uint8_t count = 0;
+        short_addr_t short_addr = 0xFF;
+        uint32_t long_addr = 0;
         while (dali.bus_manager.findNextAddress(short_addr, long_addr)) {
+
+            if (short_addr == 0xFF) {
+                if (this->m_initialize_addresses) {
+                    dali.bus_manager.programShortAddress(count);
+                    short_addr = count;
+                }
+                else {
+                    DALI_LOGW("  no short address assigned!");
+                }
+            }
+
             DALI_LOGI("  Device %.6x @ %.2x", long_addr, short_addr);
 
             if (short_addr <= 64) {
@@ -42,6 +70,8 @@ void DaliBusComponent::setup() {
             }
 
             delay(1); // yield to ESP stack
+            // TODO: Also reset task WDT
+            count++;
         }
 
         DALI_LOGD("No more devices found!");

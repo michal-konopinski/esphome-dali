@@ -133,7 +133,6 @@ bool DaliBusManager::findNextAddress(short_addr_t& out_short_addr, uint32_t& out
 
     uint32_t addr = 0x000000; // Start with the lowest address
 
-    //NOTE: This doesn't work with one of my controllers!! (or did the controller have FFFFFF assigned?)
     // Shortcut: test if we are done
     if (!compareSearchAddress(0xFFFFFF)) {
         return false;
@@ -141,27 +140,27 @@ bool DaliBusManager::findNextAddress(short_addr_t& out_short_addr, uint32_t& out
 
     for (uint32_t i = 0; i < 24; i++) {
         uint32_t bit = 1ul << (uint32_t)(23ul - i);
-        uint32_t search_addr = addr | bit;
-
-        //DALI_LOGD("Test addr %.6x", search_addr);
+        //uint32_t search_addr = addr | bit;
+        addr |= bit;
 
         // True if actual address <= search_address
-        bool compare_result = compareSearchAddress(search_addr);
+        bool compare_result = compareSearchAddress(addr);
+        //DALI_LOGD("Test addr %.6x %.2x", addr, compare_result);
         if (compare_result) {
-            addr &= ~bit; // Clear the bit (already clear)
+            addr &= ~bit; // Clear the bit
         } else {
             addr |= bit;  // Set the bit
         }
     }
 
-    DALI_LOGD("Search address: %.6x", addr);
-
     if (addr == 0xFFFFFF) {
         return false; // No more devices found
     }
 
-    // Need to increment by one to get the actual address
-    addr++;
+    // Final step in the search, set last bit if no longer matching
+    if (!compareSearchAddress(addr)) {
+        addr++;
+    }
 
     // Sanity check: Address should still return true for comparison
     if (!compareSearchAddress(addr)) {
@@ -181,24 +180,11 @@ bool DaliBusManager::findNextAddress(short_addr_t& out_short_addr, uint32_t& out
         DALI_LOGE("Short address not found for %.6x", addr);
     }
     else if (out_short_addr == 0xFF) {
-        DALI_LOGW("Short address not set for %.6x", addr);
+        //DALI_LOGW("Short address not set for %.6x", addr);
     }
     else {
         out_short_addr >>= 1; // remove command bit
     }
-
-    // DALI_LOGI("Found device %.6x @ %.2x", addr, short_addr);
-
-    // if (short_addr < MAX_SHORT_ADDRESS) {
-    //     if (m_addresses[short_addr] != 0) {
-    //         uint32_t existing_id = m_addresses[short_addr];
-    //         DALI_LOGW("Duplicate short address detected! (%0.6x, %0.6x)", existing_id, addr);
-    //     } else {
-    //         m_addresses[short_addr] = addr;
-    //     }
-    // }
-
-    //m_addresses[count] = addr;
 
     return true;
 }

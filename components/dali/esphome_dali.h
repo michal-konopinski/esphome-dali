@@ -21,6 +21,7 @@ public:
     void set_rx_pin(GPIOPin* rx_pin) { m_rxPin = rx_pin; }
 
     void do_device_discovery() { m_discovery = true; }
+    void do_initialize_addresses() { m_initialize_addresses = true; }
 
     DaliMaster dali;
 
@@ -39,6 +40,7 @@ private:
     GPIOPin* m_txPin;
 
     bool m_discovery = false;
+    bool m_initialize_addresses = false;
     uint32_t m_discovered_addresses[64];
 };
 

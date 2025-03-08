@@ -360,14 +360,13 @@ DaliBusManager(DaliPort& port)
     { }
 
     /// @brief Put a device into intialisation mode.
-    /// @remark When in intialization mode, devices will no longer accept regular commands until you send TERMINATE.
+    /// @remark Required before you can send other special commands. Expires after 15 minutes, or when you send TERMINATE.
     /// @param addr Which devices to affect
     void initialize(uint8_t addr) {
         // addr:
         // 0000 0000 : All devices
         // 0AAA AAA1 : Only devices with this address
         // 1111 1111 : Only devices without a short address
-        //Serial.println("DALI: Initialize");
         port.sendSpecialCommand(DaliSpecialCommand::INITIALISE, addr);
         port.sendSpecialCommand(DaliSpecialCommand::INITIALISE, addr);
     }
@@ -395,18 +394,23 @@ DaliBusManager(DaliPort& port)
         port.sendSpecialCommand(DaliSpecialCommand::SEARCH_ADDRH, (address >> 16) & 0xFF); // Set SEARCHH
         port.sendSpecialCommand(DaliSpecialCommand::SEARCH_ADDRM, (address >> 8) & 0xFF);  // Set SEARCHM
         port.sendSpecialCommand(DaliSpecialCommand::SEARCH_ADDRL, address & 0xFF);         // Set SEARCHL
-
+        
         port.sendSpecialCommand(DaliSpecialCommand::WITHDRAW, 0);
     }
 
     /// @brief Exit the initialization mode.
     void terminate() {
         port.sendSpecialCommand(DaliSpecialCommand::TERMINATE, 0);
+        port.sendSpecialCommand(DaliSpecialCommand::TERMINATE, 0);
     }
 
     void programShortAddress(uint8_t addr) {
         addr = ((addr & 0x3F) << 1) | DALI_COMMAND;
         port.sendSpecialCommand(DaliSpecialCommand::PROGRAM_SHORT_ADDRESS, addr);
+    }
+
+    void clearShortAddress() {
+        port.sendSpecialCommand(DaliSpecialCommand::PROGRAM_SHORT_ADDRESS, 0xFF);
     }
 
     /// @brief Automatically assign sequential short addresses to all devices on the DALI bus
