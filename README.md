@@ -36,8 +36,8 @@ dali:
 ## Future Work:
 
 - [ ] Support scenes & groups
-- [ ] Allow configuration of DALI device parameters
-- [ ] Automatic device discovery
+- [X] Allow configuration of DALI device parameters
+- [X] Automatic device discovery
 - [ ] Automatic address assignment
 - [ ] Support for RGB(W) devices
 - [ ] Hardware protocol support (no bit banging)

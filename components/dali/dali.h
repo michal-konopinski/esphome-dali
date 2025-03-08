@@ -1,20 +1,27 @@
 #pragma once
 
-#include <Arduino.h>
 #include <stdint.h>
+#include <vector>
+
+//#include <Arduino.h>
 
 #if !defined(DALI_LOGD)
-#if defined(ESP32)
+#if defined(ESPHOME_LOG_LEVEL)
+#include "esphome/core/log.h"
 static const char *const TAG_DALI = "dali";
 #define DALI_LOGD(...) ESP_LOGD(TAG_DALI, __VA_ARGS__)
+#define DALI_LOGI(...) ESP_LOGI(TAG_DALI, __VA_ARGS__)
 #define DALI_LOGW(...) ESP_LOGW(TAG_DALI, __VA_ARGS__)
 #define DALI_LOGE(...) ESP_LOGE(TAG_DALI, __VA_ARGS__)
 #elif defined(ARDUINO)
-#define DALI_LOGD(x, ...) Serial.print(x)
-#define DALI_LOGW(x, ...) Serial.print(x)
-#define DALI_LOGE(x, ...) Serial.print(x)
+// TODO: fmt strings
+#define DALI_LOGD(x, ...) Serial.println(x)
+#define DALI_LOGI(x, ...) Serial.println(x)
+#define DALI_LOGW(x, ...) Serial.println(x)
+#define DALI_LOGE(x, ...) Serial.println(x)
 #else
 #define DALI_LOGD(x, ...)
+#define DALI_LOGI(x, ...)
 #define DALI_LOGW(x, ...)
 #define DALI_LOGE(x, ...)
 #endif
@@ -362,7 +369,6 @@ DaliBusManager(DaliPort& port)
         // 1111 1111 : Only devices without a short address
         //Serial.println("DALI: Initialize");
         port.sendSpecialCommand(DaliSpecialCommand::INITIALISE, addr);
-        delay(50);
         port.sendSpecialCommand(DaliSpecialCommand::INITIALISE, addr);
     }
 
@@ -408,6 +414,12 @@ DaliBusManager(DaliPort& port)
     /// @return The number of devices found on the bus
     uint8_t autoAssignShortAddresses(uint8_t assign = ASSIGN_ALL, bool reset = true);
 
+    //uint8_t scanAddresses(std::vector<uint32_t>& addresses);
+
+    void startAddressScan();
+    bool findNextAddress(short_addr_t& short_addr, uint32_t& long_addr);
+    void endAddressScan();
+
     bool isControlGearPresent(short_addr_t addr = ADDR_BROADCAST) {
         return port.sendQueryCommand(addr, DaliCommand::QUERY_CONTROL_GEAR_PRESENT) != 0;
     }
@@ -416,8 +428,17 @@ DaliBusManager(DaliPort& port)
         return port.sendQueryCommand(addr, DaliCommand::QUERY_MISSING_SHORT_ADDRESS) != 0;
     }
 
+    uint32_t queryAddress(short_addr_t short_addr) {
+        uint32_t addr = 0;
+        addr |= (uint32_t)port.sendQueryCommand(short_addr, DaliCommand::QUERY_RANDOM_ADDRESS_H) << 16;
+        addr |= (uint32_t)port.sendQueryCommand(short_addr, DaliCommand::QUERY_RANDOM_ADDRESS_M) << 8;
+        addr |= (uint32_t)port.sendQueryCommand(short_addr, DaliCommand::QUERY_RANDOM_ADDRESS_L);
+        return addr;
+    }
+
 private:
     DaliPort& port;
+    bool _is_scanning = false;
 };
 
 class DaliLamp {

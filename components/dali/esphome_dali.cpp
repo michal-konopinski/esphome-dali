@@ -1,8 +1,8 @@
+#include <esphome.h>
 #include "esphome_dali.h"
-#include "esphome.h"
-#include "dali.h"
+#include "esphome_dali_light.h"
 
-static const char *const TAG = "dali";
+//static const char *const TAG = "dali";
 static const bool DEBUG_LOG_RXTX = false;
 
 using namespace esphome;
@@ -10,6 +10,67 @@ using namespace dali;
 
 void DaliBusComponent::setup() {
     m_txPin->pin_mode(gpio::Flags::FLAG_OUTPUT);
+
+    if (m_discovery) {
+        DALI_LOGI("Begin device discovery...");
+
+        if (dali.bus_manager.isControlGearPresent()) {
+            DALI_LOGD("Detected control gear on bus");
+        } else {
+            DALI_LOGW("No control gear detected on bus!");
+        }
+
+        dali.bus_manager.startAddressScan();
+
+
+        for (int i = 0; i < 64; i++) {
+            m_discovered_addresses[i] = 0;
+        }
+
+        short_addr_t short_addr;
+        uint32_t long_addr;
+        while (dali.bus_manager.findNextAddress(short_addr, long_addr)) {
+            DALI_LOGI("  Device %.6x @ %.2x", long_addr, short_addr);
+
+            if (short_addr <= 64) {
+                if (m_discovered_addresses[short_addr] != 0) {
+                    DALI_LOGW("WARNING: Duplicate short address detected!");
+                }
+
+                m_discovered_addresses[short_addr] = long_addr;
+                create_light_component(short_addr, long_addr);
+            }
+
+            delay(1); // yield to ESP stack
+        }
+
+        DALI_LOGD("No more devices found!");
+        dali.bus_manager.endAddressScan();
+    }
+}
+
+void DaliBusComponent::create_light_component(short_addr_t short_addr, uint32_t long_addr) {
+    DaliLight* dali_light = new DaliLight { this };
+    dali_light->set_address(short_addr);
+
+    const int MAX_STR_LEN = 20;
+    char* name = new char[MAX_STR_LEN];
+    char* id = new char[MAX_STR_LEN];
+    snprintf(name, MAX_STR_LEN, "DALI Light %d", short_addr);
+    snprintf(id, MAX_STR_LEN, "dali_light_%.6x", long_addr);
+    // NOTE: Not freeing these strings, they will be owned by LightState.
+
+    auto* light_state = new light::LightState { dali_light };
+    light_state->set_component_source("light");
+    App.register_light(light_state);
+    App.register_component(light_state);
+    light_state->set_name(name);
+    light_state->set_object_id(id);
+    light_state->set_disabled_by_default(false);
+    light_state->set_restore_mode(light::LIGHT_RESTORE_DEFAULT_ON);
+    light_state->add_effects({});
+
+    DALI_LOGI("Created light component '%s' (%s)", name, id);
 }
 
 void DaliBusComponent::loop() {
@@ -52,7 +113,7 @@ uint8_t DaliBusComponent::readByte() {
 
 void DaliBusComponent::sendForwardFrame(uint8_t address, uint8_t data) {
     if (DEBUG_LOG_RXTX) {
-        ESP_LOGD(TAG, "TX: %02x %02x", address, data);
+        DALI_LOGD("TX: %02x %02x", address, data);
         delayMicroseconds(BIT_PERIOD*8);
         //Serial.print("TX: "); Serial.print(address, HEX); Serial.print(" "); Serial.println(data, HEX);
     }
@@ -99,7 +160,7 @@ uint8_t DaliBusComponent::receiveBackwardFrame(unsigned long timeout_ms) {
 
     //Serial.print("RX: "); Serial.println(data, HEX);
     if (DEBUG_LOG_RXTX) {
-        ESP_LOGD(TAG, "RX: %02x", data);
+        DALI_LOGD("RX: %02x", data);
     }
 
     // Minimum time before we can send another forward frame

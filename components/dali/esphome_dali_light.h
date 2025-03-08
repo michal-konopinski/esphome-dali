@@ -1,9 +1,8 @@
 #pragma once
 
-#include "esphome/core/component.h"
-#include "esphome/components/output/float_output.h"
+#include <esphome.h>
 #include "esphome/components/light/light_output.h"
-#include "../esphome_dali.h"
+#include "esphome_dali.h"
 
 namespace esphome {
 namespace dali {
@@ -56,8 +55,6 @@ class DaliLight : public light::LightOutput, public Component {
     optional<uint16_t> fade_time_;
     optional<uint16_t> fade_rate_;
 
-    output::FloatOutput *color_temperature_;
-    output::FloatOutput *brightness_;
     float cold_white_temperature_;
     float warm_white_temperature_;
     float dali_tc_coolest_;

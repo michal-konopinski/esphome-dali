@@ -15,12 +15,11 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 import math
 
-from .. import dali_ns, dali_lib_ns, CONF_DALI_BUS, DaliBusComponent
+from . import dali_ns, dali_lib_ns, CONF_DALI_BUS, DaliBusComponent
 
 CONF_FADE_TIME = 'fade_time'
 CONF_FADE_RATE = 'fade_rate'
 CONF_BRIGHTNESS_CURVE = 'brightness_curve'
-
 
 DaliLight = dali_ns.class_('DaliLight', light.LightOutput)
 
@@ -144,9 +143,3 @@ async def to_code(config):
         cg.add(var.set_fade_time(config[CONF_FADE_TIME]))
     if CONF_FADE_RATE in config:
         cg.add(var.set_fade_rate(config[CONF_FADE_RATE]))
-
-
-#     # cg.add(var.set_brightness(config[CONF_BRIGHTNESS]))
-#     # cg.add(var.set_color_temperature(config[CONF_COLOR_TEMPERATURE]))
-#     cg.add(var.set_fade_time(config[CONF_FADE_TIME]))
-#     cg.add(var.set_fade_rate(config[CONF_FADE_RATE]))

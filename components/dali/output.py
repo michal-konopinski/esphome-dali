@@ -4,7 +4,7 @@ from esphome.const import CONF_ID
 import esphome.codegen as cg
 import esphome.config_validation as cv
 
-from .. import dali_ns, CONF_DALI_BUS, DaliBusComponent
+from . import dali_ns, CONF_DALI_BUS, DaliBusComponent
 
 DaliOutput = dali_ns.class_('DaliOutput', output.FloatOutput, cg.Component)
 

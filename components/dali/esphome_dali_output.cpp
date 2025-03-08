@@ -1,5 +1,6 @@
-#include "dali_output.h"
-#include "esphome.h"
+
+#include <esphome.h>
+#include "esphome_dali_output.h"
 
 using namespace esphome;
 using namespace dali;
