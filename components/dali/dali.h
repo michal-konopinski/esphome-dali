@@ -578,13 +578,20 @@ public:
     void setMinLevel(short_addr_t short_addr, uint8_t level) {
         port.setDtr0(level);
         if (port.getDtr0(short_addr) != level) {
-            //Serial.println("WARNING: DTR0 not updated!");
             DALI_LOGE("WARNING: DTR0 not updated!");
             return;
         }
         port.sendControlCommand(short_addr, DaliCommand::SET_MIN_LEVEL_DTR0);
     }
 
+    void setMaxLevel(short_addr_t short_addr, uint8_t level) {
+        port.setDtr0(level);
+        if (port.getDtr0(short_addr) != level) {
+            DALI_LOGE("WARNING: DTR0 not updated!");
+            return;
+        }
+        port.sendControlCommand(short_addr, DaliCommand::SET_MAX_LEVEL_DTR0);
+    }
 
 private:
     DaliPort& port;

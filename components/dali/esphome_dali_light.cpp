@@ -21,6 +21,11 @@ void dali::DaliLight::setup_state(light::LightState *state) {
         if (bus->dali.isDevicePresent(address_)) {
             ESP_LOGD(TAG, "DALI[%.2x] Is Present", address_);
 
+            this->dali_level_min_ = bus->dali.lamp.getMinLevel(address_);
+            this->dali_level_max_ = bus->dali.lamp.getMaxLevel(address_);
+            this->dali_level_range_ = (float)(dali_level_max_ - this->dali_level_min_ + 1);
+            ESP_LOGD(TAG, "Reported min:%d max:%d", this->dali_level_min_, this->dali_level_max_);
+
             // NOTE: Some DALI controllers report their device type is LED(6) even though they do also support color temperature,
             // so let's explicitly check if they respond to this:
             this->tc_supported_ = bus->dali.color.isTcCapable(address_);
@@ -75,6 +80,9 @@ void dali::DaliLight::setup_state(light::LightState *state) {
                 ESP_LOGD(TAG, "Setting fade time: %d", this->fade_time_.value());
                 bus->dali.lamp.setFadeTime(0, this->fade_time_.value());
             }
+
+            // bus->dali.lamp.setMinLevel(address_, 1);
+            // bus->dali.lamp.setMaxLevel(address_, 254);
 
             // Query the actual brightness level of the device and 
             // ensure this is reflected in the ESPHome component itself...
@@ -136,7 +144,8 @@ void dali::DaliLight::write_state(light::LightState *state) {
     state->current_values_as_binary(&on);
     if (!on) {
         // Short cut: send power off command
-        bus->dali.lamp.turnOff(address_);
+        //bus->dali.lamp.turnOff(address_); // no fade
+        bus->dali.lamp.setBrightness(address_, 0); // fade
         return;
     }
 
@@ -147,9 +156,6 @@ void dali::DaliLight::write_state(light::LightState *state) {
         // NOTE: Not using the configuration warm/cool colours - these may not match the reported range of the DALI device.
         float color_temperature_mired = (color_temperature * (dali_tc_warmest_ - dali_tc_coolest_)) + dali_tc_coolest_;
 
-        //float color_temperature_mired = (color_temperature * (warm_white_temperature_ - cold_white_temperature_)) + cold_white_temperature_;
-        //float color_temperature_mired = (color_temperature * (1000 - 10)) + 10;
-        
         uint16_t dali_color_temperature = static_cast<uint16_t>(color_temperature_mired);
 
         // Only update if temperature has changed, to allow faster brightness changes
@@ -166,8 +172,10 @@ void dali::DaliLight::write_state(light::LightState *state) {
         state->current_values_as_brightness(&brightness);
     }
 
-    uint8_t dali_brightness = static_cast<uint8_t>(brightness * DALI_MAX_BRIGHTNESS_F);
+    int dali_brightness = static_cast<uint8_t>(brightness * this->dali_level_range_) + this->dali_level_min_ - 1;
+    if (dali_brightness < 1) dali_brightness = 1;
+    if (dali_brightness > 254) dali_brightness = 254;
 
     //ESP_LOGD(TAG, "B=%.2f (%d)", brightness, dali_brightness);
-    bus->dali.lamp.setBrightness(address_, dali_brightness);
+    bus->dali.lamp.setBrightness(address_, (uint8_t)dali_brightness);
 }

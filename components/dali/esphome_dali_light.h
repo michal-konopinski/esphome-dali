@@ -26,6 +26,9 @@ class DaliLight : public light::LightOutput, public Component {
         , tc_supported_(false)
         , dali_tc_coolest_(COLOR_MIREK_COOLEST)
         , dali_tc_warmest_(400.0f)
+        , dali_level_min_(1)
+        , dali_level_max_(254)
+        , dali_level_range_(254.0f)
         , color_mode_()
         , brightness_curve_()
     { }
@@ -59,6 +62,9 @@ class DaliLight : public light::LightOutput, public Component {
     float warm_white_temperature_;
     float dali_tc_coolest_;
     float dali_tc_warmest_;
+    uint8_t dali_level_min_;
+    uint8_t dali_level_max_;
+    float dali_level_range_;
     optional<DaliColorMode> color_mode_;
     optional<DaliLedDimmingCurve> brightness_curve_;
 
