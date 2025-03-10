@@ -21,7 +21,9 @@ void setup() {
 
 }
 
-uint8_t daliAutoAssignShortAddresses(uint8_t assign = ASSIGN_ALL, bool reset = true);
+//uint8_t daliAutoAssignShortAddresses(uint8_t assign = ASSIGN_ALL, bool reset = true);
+
+static bool has_assigned_address = false;
 
 void loop() {
     static uint8_t address = 0; // Example address
@@ -29,17 +31,21 @@ void loop() {
 
 #if 1
     //Serial.print("DALI: Query control gear presence: ");
-    // if (!dali.bus_manager.isControlGearPresent()) {
-    //     Serial.println("Control gear: not present");
-    //     return;
-    // } else {
-    //     Serial.println("Control gear: present");
-    // }
+    if (!dali.bus_manager.isControlGearPresent()) {
+        Serial.println("Control gear: not present");
+        delay(5000);
+        return;
+    } else {
+        Serial.println("Control gear: present");
+    }
 
     //Serial.print("DALI: Query short addr: ");
-    if (dali.bus_manager.isMissingShortAddress()) {
+    //if (dali.bus_manager.isMissingShortAddress()) {
+    if (!has_assigned_address) {
+        has_assigned_address = true;
         Serial.println("One or more devices are missing a short address");
-        delay(5000);
+        delay(15000);
+        Serial.println("Assigning addresses...");
 
         device_count = dali.bus_manager.autoAssignShortAddresses(ASSIGN_ALL);
         //device_count = daliAutoAssignShortAddresses(ASSIGN_ALL, true);
@@ -80,7 +86,7 @@ void loop() {
         return;
     }
 
-    dali.dumpStatusForDevice(0);
+    //dali.dumpStatusForDevice(0);
 
     //dali.reset(0);
     // dali.lamp.setFadeRate(0, 7);

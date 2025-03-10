@@ -38,9 +38,15 @@ class DaliLight : public light::LightOutput, public Component {
     void setup_state(light::LightState *state) override;
     void write_state(light::LightState *state) override;
 
-    float get_setup_priority() const override { return setup_priority::AFTER_CONNECTION; }
+    void set_address(uint8_t address) { 
+        address_ = address; 
 
-    void set_address(uint8_t address) { address_ = address; }
+        // Prevent dynamic creation of lights with this address
+        // (when device discovery is enabled)
+        if (this->address_ <= ADDR_SHORT_MAX) {
+            bus->register_static_addr(address_);
+        }
+    }
 
     void set_cold_white_temperature(float cold_white_temperature) { cold_white_temperature_ = cold_white_temperature; }
     void set_warm_white_temperature(float warm_white_temperature) { warm_white_temperature_ = warm_white_temperature; }
@@ -50,6 +56,9 @@ class DaliLight : public light::LightOutput, public Component {
 
     void set_fade_time(uint16_t fade_time) { fade_time_ = fade_time; }
     void set_fade_rate(uint16_t fade_rate) { fade_rate_ = fade_rate; }
+
+    // NOTE: Must have a lower priority number than the DALI bus component
+    float get_setup_priority() const override { return setup_priority::DATA; }
 
  protected:
     DaliBusComponent *bus;

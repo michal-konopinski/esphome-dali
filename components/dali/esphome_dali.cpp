@@ -1,81 +1,177 @@
 #include <esphome.h>
+#include <esp_task_wdt.h>
 #include "esphome_dali.h"
 #include "esphome_dali_light.h"
 
 //static const char *const TAG = "dali";
-static const bool DEBUG_LOG_RXTX = false;
+static const bool DEBUG_LOG_RXTX = false; // NOTE: Will probably trigger WDT
 
 using namespace esphome;
 using namespace dali;
 
 void DaliBusComponent::setup() {
     m_txPin->pin_mode(gpio::Flags::FLAG_OUTPUT);
+    m_rxPin->pin_mode(gpio::Flags::FLAG_INPUT);
+    DALI_LOGI("DALI bus ready");
 
     if (m_discovery) {
-        DALI_LOGI("Begin device discovery...");
+        // Optional: reset devices on the bus so we are in a known-good state.
+        // Can help if devices are not responding to anything.
+        if (false) {
+            this->resetBus();
+            esp_task_wdt_reset();
+        }
 
-        // if (dali.bus_manager.isControlGearPresent()) {
-        //     DALI_LOGD("Detected control gear on bus");
-        // } else {
-        //     DALI_LOGW("No control gear detected on bus!");
+        if (dali.bus_manager.isControlGearPresent()) {
+            DALI_LOGD("Detected control gear on bus");
+        } else {
+            DALI_LOGW("No control gear detected on bus!");
+        }
+
+        // for (int i = 0; i <= ADDR_SHORT_MAX; i++) {
+        //     if (m_addresses[i] != 0) {
+        //         DALI_LOGD("Static config addr: %.2x", i);
+        //     }
         // }
 
-        if (this->m_initialize_addresses) {
-            DALI_LOGI("Randomizing addresses for unassigned DALI devices");
-            // Only randomize devices without an assigned short address
-            dali.bus_manager.initialize(ASSIGN_UNINITIALIZED); 
-            //dali.bus_manager.initialize(ASSIGN_ALL); 
+        if (this->m_initialize_addresses != DaliInitMode::DiscoverOnly) {
+            if (this->m_initialize_addresses == DaliInitMode::InitializeAll) {
+                DALI_LOGI("Randomizing addresses for *all* DALI devices");
+                dali.bus_manager.initialize(ASSIGN_ALL); 
+            } 
+            else if (this->m_initialize_addresses == DaliInitMode::InitializeUnassigned) {
+                // Only randomize devices without an assigned short address
+                DALI_LOGI("Randomizing addresses for unassigned DALI devices");
+                dali.bus_manager.initialize(ASSIGN_UNINITIALIZED); 
+            }
+
             dali.bus_manager.randomize();
             dali.bus_manager.terminate();
+
             // Seem to need a delay to allow time for devices to randomize...
+            delay(50);
         }
 
+        DALI_LOGI("Begin device discovery...");
         dali.bus_manager.startAddressScan(); // All devices
 
-        for (int i = 0; i < 64; i++) {
-            m_discovered_addresses[i] = 0;
+        // Keep track of short addresses to detect duplicates
+        bool duplicate_detected = false;
+        bool is_discovered[ADDR_SHORT_MAX+1];
+        for (int i = 0; i <= ADDR_SHORT_MAX; i++) {
+            is_discovered[i] = false;
         }
 
-        // TODO: Device discovery doesn't seem to be working correctly with two devices attached.
-        // Unsure if it is my physical circuit, or a bug in the discovery algorithm.
-        //
-        // It seems that both devices get assigned different random addresses,
-        // and the search correctly finds the lowest address,
-        // but when calling withdraw() on the lower address both stop responding.
-        // 
         uint8_t count = 0;
         short_addr_t short_addr = 0xFF;
         uint32_t long_addr = 0;
         while (dali.bus_manager.findNextAddress(short_addr, long_addr)) {
+            count++;
+            delay(1); // yield to ESP stack
+            esp_task_wdt_reset();
 
-            if (short_addr == 0xFF) {
-                if (this->m_initialize_addresses) {
-                    dali.bus_manager.programShortAddress(count);
-                    short_addr = count;
+            // if (short_addr == 0xFF) {
+            //     if (this->m_initialize_addresses) {
+                    
+            //         //dali.bus_manager.programShortAddress(count);
+            //         // short_addr_t new_addr = 1;
+            //         // programShortAddress(new_addr);
+            
+            //         // port.sendSpecialCommand(DaliSpecialCommand::QUERY_SHORT_ADDRESS, 0);
+            //         // out_short_addr = port.receiveBackwardFrame();
+            
+            //         // if (out_short_addr != new_addr) {
+            //         //     DALI_LOGE("Could not program short address");
+            //         //     out_short_addr = 0xFF;
+            //         // }
+
+            //         short_addr_t new_addr = count;
+
+            //         dali.bus_manager.programShortAddress(new_addr);
+
+            //         dali.port.sendSpecialCommand(DaliSpecialCommand::QUERY_SHORT_ADDRESS, 0);
+            //         short_addr = dali.port.receiveBackwardFrame();
+            
+            //         if (short_addr != new_addr) {
+            //             DALI_LOGE("  Could not program short address");
+            //             continue;
+            //         }
+            //     }
+            //     else {
+            //         // You'll need to assign a short address before the device will respond to commands.
+            //         // However it will still respond to BROADCAST brightness updates...
+            //         DALI_LOGW("  No short address assigned!");
+            //         continue;
+            //     }
+            // }
+
+            if (short_addr <= ADDR_SHORT_MAX) {
+                DALI_LOGI("  Device %.6x @ %.2x", long_addr, short_addr);
+
+                // Duplicate detection
+                if (is_discovered[short_addr]) {
+                    if (m_initialize_addresses == DaliInitMode::DiscoverOnly) {
+                        DALI_LOGW("  WARNING: Duplicate short address detected!");
+                        duplicate_detected = true;
+                        // TODO: Maybe don't register the component in this case?
+                        // Brightness control will work, but reported capabilities will not be correct.
+                    }
+                    else {
+                        // Assign a new address for this
+                        short_addr++;
+                        DALI_LOGD("  Duplicate short address detected, assigning a new address: %.2x", short_addr);
+
+                        if (!dali.bus_manager.programShortAddress(short_addr)) {
+                            DALI_LOGE("  Could not program short address");
+                            short_addr = 0xFF;
+                            continue;
+                        }
+                    }
                 }
                 else {
-                    DALI_LOGW("  no short address assigned!");
-                }
-            }
-
-            DALI_LOGI("  Device %.6x @ %.2x", long_addr, short_addr);
-
-            if (short_addr <= 64) {
-                if (m_discovered_addresses[short_addr] != 0) {
-                    DALI_LOGW("WARNING: Duplicate short address detected!");
+                    is_discovered[short_addr] = true;
                 }
 
-                m_discovered_addresses[short_addr] = long_addr;
-                create_light_component(short_addr, long_addr);
+                // Dynamic component creation (if not defined in YAML)
+                if (m_addresses[short_addr]) {
+                    DALI_LOGD("  Ignoring, already defined");
+                }
+                else {
+                    m_addresses[short_addr] = long_addr;
+                    create_light_component(short_addr, long_addr);
+                }
             }
+            else if (short_addr == 0xFF) {
+                if (m_initialize_addresses == DaliInitMode::DiscoverOnly) {
+                    DALI_LOGI("  Device %.6x @ --", long_addr);
+                    // You'll need to assign a short address before the device will respond to commands.
+                    // However it will still respond to BROADCAST brightness updates...
+                    DALI_LOGW("  No short address assigned!");
+                    continue;
+                }
+                else {
+                    short_addr = 1;
+                    DALI_LOGI("  Assigning short address: %.2x", short_addr);
 
-            delay(1); // yield to ESP stack
-            // TODO: Also reset task WDT
-            count++;
+                    if (!dali.bus_manager.programShortAddress(short_addr)) {
+                        DALI_LOGE("  Could not program short address");
+                        short_addr = 0xFF;
+                        continue;
+                    }
+
+                    DALI_LOGI("  Device %.6x @ %.2x", long_addr, short_addr);
+                }
+            }
         }
 
         DALI_LOGD("No more devices found!");
         dali.bus_manager.endAddressScan();
+
+        if (duplicate_detected) {
+            DALI_LOGW("Duplicate short addresses detected on the bus!");
+            DALI_LOGW("  Devices may report inconsistent capabilities.");
+            DALI_LOGW("  You should fix your address assignments.");
+        }
     }
 }
 
@@ -141,6 +237,13 @@ uint8_t DaliBusComponent::readByte() {
     return byte;
 }
 
+void DaliBusComponent::resetBus() {
+    DALI_LOGD("Resetting bus");
+    m_txPin->digital_write(HIGH);
+    delay(1000);
+    m_txPin->digital_write(LOW);
+}
+
 void DaliBusComponent::sendForwardFrame(uint8_t address, uint8_t data) {
     if (DEBUG_LOG_RXTX) {
         DALI_LOGD("TX: %02x %02x", address, data);
@@ -174,6 +277,9 @@ uint8_t DaliBusComponent::receiveBackwardFrame(unsigned long timeout_ms) {
     while (m_rxPin->digital_read() == LOW) {
         if (millis() - startTime >= timeout_ms) {
             //Serial.println("No reply");
+            if (DEBUG_LOG_RXTX) {
+                DALI_LOGD("RX: 00 (NACK)");
+            }
             return 0;
         }
     }

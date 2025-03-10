@@ -7,38 +7,65 @@ This component implements a DALI master that can talk to devices on a DALI bus.
 
 ## Supported Features:
 
+- Automatic device discovery & address assignment
 - DALI dimmer support
   - brightness control
   - colour temperature control
 - Broadcast or short address
 - Query device capabilities 
   - `dali.light` component automatically enables colour temperature if device reports the capability
+- DALI parameter configuration
+  - Fade rate/time
+  - Brightness curve (log/linear)
 
 ## Usage:
+
+Lights can be automatically discovered on the bus by simply defining a dali bus component:
+
+```yaml
+# bit-banged 1200 baud DALI bus
+dali:
+  id: dali_bus
+  tx_pin: 4
+  rx_pin: 12
+
+  # Lights will be created for each detected DALI light device
+  discovery: true
+
+  # Devices will be automatically assigned a short address if they do not have one
+  initialize_addresses: true
+```
+
+![HomeAssistant Discovery](doc/ha-discovery.png)
+
+If you do not want to use automatic discovery, or want to customize a specific light,
+you can specify the light component with an address like so:
 
 ```yaml
 light:
 - platform: dali
   id: dali_light
   name: "DALI Light"
-  address: 0 # Short address or group address, omit for broadcast
+  address: 0 # Short address, group address, or omit for broadcast
   restore_mode: RESTORE_DEFAULT_ON 
 
-# bit-banged 1200 baud DALI bus
-dali:
-  id: dali_bus
-  tx_pin: 4
-  rx_pin: 12
-```
+  # Set the brightness curve on the device
+  brightness_curve: LOGARITHMIC # (default)
 
-![HomeAssistant Control UI](doc/ha-control.png)
+  # Force a specific color mode, irrespective of what the device claims.
+  color_mode: COLOR_TEMPERATURE # (default: auto detect)
+
+  # Update the fade time/rate on the device
+  fade_time: 1s
+  fade_rate: 44724  # steps/second
+```
 
 ## Future Work:
 
 - [ ] Support scenes & groups
 - [X] Allow configuration of DALI device parameters
 - [X] Automatic device discovery
-- [ ] Automatic address assignment
+- [X] Automatic address assignment
 - [ ] Support for RGB(W) devices
 - [ ] Hardware protocol support (no bit banging)
 
@@ -103,3 +130,11 @@ I succsessfully used an opamp current limiting circuit as I didn't have an LM317
 It has been noted elsewhere that if using a LM317, it MUST be an on-brand chip, and preferably the `LM317DCYR` from Texas Instruments.
 
 I will later be releasing a Kicad project for a DALI bus adapter board that more closely follows the spec.
+
+## Device Support
+
+The following devices have been tested with this library:
+
+- EOKE BK-DWL060-1500AD (63W CCT LED Driver, min brightness 86)
+- LTECH LM-75-24-G2D2 (75W CCT LED Driver, 1000:1 dimming range)
+- LTECH MT-100-650-D2D1-A1 (48VDC CCT LED Driver PCB Module)

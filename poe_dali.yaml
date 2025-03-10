@@ -69,7 +69,7 @@ output:
 
 dali:
   id: dali_bus
-  tx_pin: 4
-  rx_pin: 12
+  tx_pin: 322
+  rx_pin: 33
   discovery: true  # If set, dali_light components will automatically be created from devices found on the bus
   initialize_addresses: true  # If set, unassigned devices will be automatically assigned an address

@@ -22,6 +22,8 @@ public:
         bus = parent;
     }
 
+    float get_setup_priority() const override { return setup_priority::DATA; }
+
 private:
     DaliBusComponent *bus;
 };

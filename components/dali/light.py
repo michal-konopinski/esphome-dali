@@ -20,6 +20,7 @@ from . import dali_ns, dali_lib_ns, CONF_DALI_BUS, DaliBusComponent
 CONF_FADE_TIME = 'fade_time'
 CONF_FADE_RATE = 'fade_rate'
 CONF_BRIGHTNESS_CURVE = 'brightness_curve'
+DEPENDENCIES = ['dali']
 
 DaliLight = dali_ns.class_('DaliLight', light.LightOutput)
 

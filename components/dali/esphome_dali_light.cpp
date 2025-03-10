@@ -38,28 +38,19 @@ void dali::DaliLight::setup_state(light::LightState *state) {
                 uint16_t warmest = bus->dali.color.queryParameter(address_, DaliColorParam::ColourTemperatureTcWarmest);
 
                 ESP_LOGD(TAG, "Tc(cool)=%d, Tc(warm)=%d", coolest, warmest);
-
-                // Store reported coolest/warmest mired values for mapping.
-                // NOTE: Not updating the configuration-provided warm/cool values, those are for UI only.
-                // Ultimately we don't really want to trust the mired range reported by the dimmer
-                // as it depends on the LED strip attached. So we map the UI range into the reported range.
-                this->dali_tc_coolest_ = (float)coolest;
-                //this->dali_tc_warmest_ = (float)warmest;
+                if (coolest > COLOR_MIREK_WARMEST || warmest > COLOR_MIREK_WARMEST) {
+                    ESP_LOGW(TAG, "Tc min/max is out of range!");
+                } else {
+                    // Store reported coolest/warmest mired values for mapping.
+                    // NOTE: Not updating the configuration-provided warm/cool values, those are for UI only.
+                    // Ultimately we don't really want to trust the mired range reported by the dimmer
+                    // as it depends on the LED strip attached. So we map the UI range into the reported range.
+                    this->dali_tc_coolest_ = (float)coolest;
+                    //this->dali_tc_warmest_ = (float)warmest;
+                }
             }
             else {
                 ESP_LOGD(TAG, "Does not support color temperature");
-            }
-
-            // Force a color mode irrespective of what the device itself says it supports
-            // eg. you can convert a CT capable device to a plain brighness device
-            if (this->color_mode_.has_value()) {
-                if (this->color_mode_.value() == DaliColorMode::COLOR_TEMPERATURE) {
-                    tc_supported_ = true;
-                    ESP_LOGD(TAG, "Override: supports color temperature");
-                } else {
-                    tc_supported_ = false;
-                    ESP_LOGD(TAG, "Override: does not support color temperature");
-                }
             }
 
             ESP_LOGD(TAG, "Sending configuration to device...");
@@ -115,6 +106,17 @@ void dali::DaliLight::setup_state(light::LightState *state) {
     else {
         // TODO: How do we detect color temperature support for broadcast and group addresses?
     }
+
+
+    // if (this->color_mode_.has_value()) {
+    //     if (this->color_mode_.value() == DaliColorMode::COLOR_TEMPERATURE) {
+    //         tc_supported_ = true;
+    //         ESP_LOGD(TAG, "Override: enable color temperature support");
+    //     } else {
+    //         tc_supported_ = false;
+    //         ESP_LOGD(TAG, "Override: disable color temperature support");
+    //     }
+    // }
 }
 
 light::LightTraits dali::DaliLight::get_traits() {
@@ -122,13 +124,37 @@ light::LightTraits dali::DaliLight::get_traits() {
 
     // NOTE: This is called repeatedly, do not perform any bus queries here...
 
-    if (this->tc_supported_) {
-        traits.set_supported_color_modes({light::ColorMode::COLOR_TEMPERATURE});
-        traits.set_min_mireds(this->cold_white_temperature_);
-        traits.set_max_mireds(this->warm_white_temperature_);
+    // Force a color mode irrespective of what the device itself says it supports
+    // eg. you can convert a CT capable device to a plain brighness device,
+    // or force colour temperature support and hope the device recognizes the command...
+    if (this->color_mode_.has_value()) {
+        switch (this->color_mode_.value()) {
+            case DaliColorMode::COLOR_TEMPERATURE: 
+                this->tc_supported_ = true;
+                traits.set_supported_color_modes({light::ColorMode::COLOR_TEMPERATURE});
+                traits.set_min_mireds(this->cold_white_temperature_);
+                traits.set_max_mireds(this->warm_white_temperature_);
+                break;
+            case DaliColorMode::BRIGHTNESS:
+                this->tc_supported_ = false;
+                traits.set_supported_color_modes({light::ColorMode::BRIGHTNESS});
+                break;
+            case DaliColorMode::ON_OFF:
+                this->tc_supported_ = false;
+                traits.set_supported_color_modes({light::ColorMode::ON_OFF});
+                break;
+        }
     }
     else {
-        traits.set_supported_color_modes({light::ColorMode::BRIGHTNESS});
+        // Device reports color temperature support
+        if (this->tc_supported_) {
+            traits.set_supported_color_modes({light::ColorMode::COLOR_TEMPERATURE});
+            traits.set_min_mireds(this->cold_white_temperature_);
+            traits.set_max_mireds(this->warm_white_temperature_);
+        }
+        else {
+            traits.set_supported_color_modes({light::ColorMode::BRIGHTNESS});
+        }
     }
 
     return traits;
@@ -162,7 +188,7 @@ void dali::DaliLight::write_state(light::LightState *state) {
         if (dali_color_temperature != last_temperature) {
             last_temperature = dali_color_temperature;
 
-            //ESP_LOGD(TAG, "Tc=%f (%d)", color_temperature_mired, dali_color_temperature);
+            ESP_LOGD(TAG, "DALI[%d] Tc=%d", address_, dali_color_temperature);
 
             // IMPORTANT: Do not set start_fade (activate), or the color temperature fade will
             // be cancelled when we next call setBrightness, and no color change will occur.
@@ -176,6 +202,6 @@ void dali::DaliLight::write_state(light::LightState *state) {
     if (dali_brightness < 1) dali_brightness = 1;
     if (dali_brightness > 254) dali_brightness = 254;
 
-    //ESP_LOGD(TAG, "B=%.2f (%d)", brightness, dali_brightness);
+    ESP_LOGD(TAG, "DALI[%d] B=%.2f (%d)", address_, brightness, dali_brightness);
     bus->dali.lamp.setBrightness(address_, (uint8_t)dali_brightness);
 }

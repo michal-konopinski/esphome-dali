@@ -177,12 +177,10 @@ bool DaliBusManager::findNextAddress(short_addr_t& out_short_addr, uint32_t& out
     port.sendSpecialCommand(DaliSpecialCommand::QUERY_SHORT_ADDRESS, 0);
     out_short_addr = port.receiveBackwardFrame();
     if (out_short_addr == 0) {
-        DALI_LOGE("Short address not found for %.6x", addr);
+        DALI_LOGW("Short address not found for %.6x", addr);
+        out_short_addr = 0xFF;
     }
-    else if (out_short_addr == 0xFF) {
-        //DALI_LOGW("Short address not set for %.6x", addr);
-    }
-    else {
+    else if (out_short_addr <= ADDR_SHORT_MAX) {
         out_short_addr >>= 1; // remove command bit
     }
 

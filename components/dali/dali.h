@@ -1,9 +1,6 @@
 #pragma once
 
 #include <stdint.h>
-#include <vector>
-
-//#include <Arduino.h>
 
 #if !defined(DALI_LOGD)
 #if defined(ESPHOME_LOG_LEVEL)
@@ -15,15 +12,24 @@ static const char *const TAG_DALI = "dali";
 #define DALI_LOGE(...) ESP_LOGE(TAG_DALI, __VA_ARGS__)
 #elif defined(ARDUINO)
 // TODO: fmt strings
-#define DALI_LOGD(x, ...) Serial.println(x)
-#define DALI_LOGI(x, ...) Serial.println(x)
-#define DALI_LOGW(x, ...) Serial.println(x)
-#define DALI_LOGE(x, ...) Serial.println(x)
+#include <Arduino.h>
+static void ard_log(const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    char buf[64];
+    vsnprintf(buf, sizeof(buf), format, args);
+    Serial.println(buf);
+    va_end(args);
+}
+#define DALI_LOGD(...) ard_log(__VA_ARGS__)
+#define DALI_LOGI(...) ard_log(__VA_ARGS__)
+#define DALI_LOGW(...) ard_log(__VA_ARGS__)
+#define DALI_LOGE(...) ard_log(__VA_ARGS__)
 #else
-#define DALI_LOGD(x, ...)
-#define DALI_LOGI(x, ...)
-#define DALI_LOGW(x, ...)
-#define DALI_LOGE(x, ...)
+#define DALI_LOGD(...)
+#define DALI_LOGI(...)
+#define DALI_LOGW(...)
+#define DALI_LOGE(...)
 #endif
 #endif
 
@@ -38,6 +44,7 @@ typedef uint8_t short_addr_t;
 #define ADDR_BROADCAST (0x7F)       // 1111 111
 #define ADDR_GROUP     (0x40)       // 100x xxx
 #define ADDR_GROUP_MASK (0x70)       // 111x xxx
+#define ADDR_SHORT_MAX  (63)
 
 #define DALI_COMMAND    (0x01)
 #define DALI_DIRECT_ARC (0x00)
@@ -226,6 +233,8 @@ public:
     virtual uint8_t receiveBackwardFrame(unsigned long timeout_ms = 100);
 
 public:
+    virtual void resetBus() { }
+
     /// @brief Send a query command to the DALI bus and return the response
     /// @param address Device address, group address, or broadcast
     /// @param command Command byte
@@ -404,13 +413,16 @@ DaliBusManager(DaliPort& port)
         port.sendSpecialCommand(DaliSpecialCommand::TERMINATE, 0);
     }
 
-    void programShortAddress(uint8_t addr) {
+    bool programShortAddress(uint8_t addr) {
         addr = ((addr & 0x3F) << 1) | DALI_COMMAND;
         port.sendSpecialCommand(DaliSpecialCommand::PROGRAM_SHORT_ADDRESS, addr);
+
+        port.sendSpecialCommand(DaliSpecialCommand::VERIFY_SHORT_ADDRESS, addr);
+        return (port.receiveBackwardFrame() == 0xFF);
     }
 
     void clearShortAddress() {
-        port.sendSpecialCommand(DaliSpecialCommand::PROGRAM_SHORT_ADDRESS, 0xFF);
+        port.sendSpecialCommand(DaliSpecialCommand::PROGRAM_SHORT_ADDRESS, 0x7F);
     }
 
     /// @brief Automatically assign sequential short addresses to all devices on the DALI bus
@@ -456,7 +468,7 @@ public:
     /// @param short_addr Device or group short address, or ADDR_BROADCAST
     /// @param level min..max. or, 0->min  255->stop fading
     void setBrightness(short_addr_t addr, uint8_t brightness) {
-        DALI_LOGD("DALI: Setting brightness to %d", brightness);
+        //DALI_LOGD("DALI: Setting brightness to %d", brightness);
         // Serial.print("DALI: Brightness="); 
         // if (brightness == 0) Serial.println("MIN");
         // else if (brightness == 0xFF) Serial.println("STOP");
@@ -467,7 +479,7 @@ public:
 
     /// @brief Turn off immediately without fading
     void turnOff(short_addr_t short_addr = ADDR_BROADCAST) {
-        DALI_LOGD("DALI: Lamp Off");
+        //DALI_LOGD("DALI: Lamp Off");
         //Serial.println("DALI: Lamp Off");
         port.sendControlCommand(short_addr, DaliCommand::OFF);
     }
@@ -488,7 +500,7 @@ public:
     /// @param short_addr 
     void fadeToMaximum(short_addr_t short_addr = ADDR_BROADCAST) {
         //Serial.println("DALI: Brightness=MAX");
-        DALI_LOGD("DALI: Brightness=MAX");
+        //DALI_LOGD("DALI: Brightness=MAX");
         port.sendControlCommand(short_addr, DaliCommand::RECALL_MAX_LEVEL);
     }
 
@@ -496,7 +508,7 @@ public:
     /// @param short_addr 
     void fadeToMinimum(short_addr_t short_addr = ADDR_BROADCAST) {
         //Serial.println("DALI: Brightness=MIN");
-        DALI_LOGD("DALI: Brightness=MIN");
+        //DALI_LOGD("DALI: Brightness=MIN");
         port.sendControlCommand(short_addr, DaliCommand::RECALL_MIN_LEVEL);
     }
 
