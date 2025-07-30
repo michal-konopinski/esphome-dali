@@ -23,6 +23,14 @@ void dali::DaliLight::setup_state(light::LightState *state) {
 
             this->dali_level_min_ = bus->dali.lamp.getMinLevel(address_);
             this->dali_level_max_ = bus->dali.lamp.getMaxLevel(address_);
+            if (this->dali_level_min_==255) {
+                ESP_LOGD(TAG, "Forced minLevel %d to 1", this->dali_level_min_);
+                this->dali_level_min_=1;
+            }
+            if (this->dali_level_max_==255) {
+                ESP_LOGD(TAG, "Forced maxLevel %d to 254", this->dali_level_min_);
+                this->dali_level_max_=254;
+            }
             this->dali_level_range_ = (float)(dali_level_max_ - this->dali_level_min_ + 1);
             ESP_LOGD(TAG, "Reported min:%d max:%d", this->dali_level_min_, this->dali_level_max_);
 
